@@ -176,6 +176,22 @@ models (teacher, ZO-PGA student, CE and KD baselines), per-class test
 accuracies, the distillation end-state (KD loss, agreement, label accuracy),
 diagnostics and per-stage timings, plus the resolved hardware settings.
 
+## Exporting synthetic data to external pipelines
+
+`scripts/export_synthetic.py` converts a repo synthetic set into the plain
+`(imgs, labels, logits)` tuple format used by standalone KD pipelines:
+images de-normalized to `[0, 1]` pixel space, labels (constructed or teacher
+argmax via `--labels`), and the frozen repo teacher's logits on the clean
+images (label purity is reported).
+
+```bash
+python scripts/export_synthetic.py --config configs/cifar10_resnet.yaml \
+  --out synthetic_data/zopga_cifar10_synthetic.pt
+```
+
+Defaults read `runs/<case>/synthetic/synthetic.pt` and
+`runs/<case>/teacher/best.pt`; override with `--pt` / `--teacher` / `--out`.
+
 ## Expected parameter counts
 
 | Pair | Teacher | Student |
