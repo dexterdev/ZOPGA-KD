@@ -3,3 +3,4 @@ torchvision>=0.15
 numpy>=1.24
 pyyaml>=6.0
 psutil>=5.9    # RAM detection for hardware-aware auto settings (optional, stdlib fallback exists)
+matplotlib>=3.7
