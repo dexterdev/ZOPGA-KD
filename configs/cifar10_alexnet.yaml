@@ -41,8 +41,8 @@ synthesis:
   mode: zo
   init: all                 # candidate init families: all | subset of
                             #   [corner, horizontal, vertical, angled, radial, perlin]
-  query_augment: all        # ZO query-augmentation pool: all (classic 17 ops =
-                            #   AutoAugment's 16 + identity) | subset of op names
+  query_augment: all        # ZO query-augmentation pool: all (17 ops: geometric,
+                            #   photometric, noise -- see synthesis/augment.py) | subset
   n_random_ops: 2           # random ops per gradient query (0 = augmentation off);
                             #   tau acceptance always uses the clean image
   per_class: 200
