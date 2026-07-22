@@ -40,7 +40,9 @@ student:
 synthesis:
   mode: zo                  # zo | whitebox (whitebox = true-gradient upper bound)
   init: all                 # candidate init families: all | subset of
-                            #   [corner, horizontal, vertical, angled, radial, perlin]
+                            #   [corner, horizontal, vertical, angled, radial,
+                            #   perlin, checkerboard, gabor, uniform, gaussian,
+                            #   pink, edges]
   per_class: 100
   q: 32                     # ZO directions per step (2q teacher queries)
   sigma: 0.01               # finite-difference smoothing radius

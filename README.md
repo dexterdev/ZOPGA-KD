@@ -17,10 +17,14 @@ images on the fly with soft targets.
    synthesis only needs forward queries.
 2. **Synthesis (ZO-PGA).** For each target class `c`, a persistent pool of
    candidate images is cycled until `per_class` images are accepted:
-   - *Init:* diverse low-frequency patterns — smooth gradients (corner,
-     horizontal, vertical, angled, radial) and fractal Perlin noise — never
-     white noise. The family pool is the `synthesis.init` hyperparameter
-     (`all` or any subset, e.g. `init: [perlin, radial]`).
+   - *Init:* a diverse pool of pattern families — smooth gradients (corner,
+     horizontal, vertical, angled, radial) and fractal Perlin noise, plus
+     structured textures (checkerboard gratings, Gabor patches, random
+     straight edges) and stochastic noise (uniform/white, gaussian, and pink
+     `1/f^α` spectral noise). The family pool is the `synthesis.init`
+     hyperparameter (`all` or any subset, e.g. `init: [perlin, gabor, pink]`);
+     per-channel patterns get random scale/offset so draws cover the whole
+     valid pixel box.
    - *Gradient:* `g ≈ (1/q) Σ [f(x+σuᵢ) − f(x−σuᵢ)] / (2σ) · uᵢ`, with
      `f(x) = log p(c|x)` and directions `uᵢ` sampled at low resolution
      (e.g. 8×8), bilinearly upsampled and normalized. All 2q perturbations of
@@ -263,7 +267,8 @@ zopga/
   data.py                 # CIFAR-10 / Fashion-MNIST / MNIST loaders & splits
   teacher.py              # teacher CE training + frozen black-box loading
   synthesis/
-    initializers.py       # low-frequency init families (gradients, Perlin);
+    initializers.py       # init families (gradients, Perlin, checkerboard,
+                          #   Gabor, uniform/gaussian/pink noise, edges);
                           #   pool selected by synthesis.init
     zo.py                 # ZO gradient estimators + white-box reference
     optimizers.py         # heavy-ball, ZO-AdaMM
