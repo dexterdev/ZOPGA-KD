@@ -86,7 +86,16 @@ python run.py synthesize    --config configs/mnist_lenet.yaml --mode whitebox  #
 python run.py distill       --config configs/mnist_lenet.yaml
 python run.py baseline      --config configs/mnist_lenet.yaml --method both    # ce|kd|both
 python run.py diagnose      --config configs/mnist_lenet.yaml
+python run.py visualize     --config configs/mnist_lenet.yaml               # 10x10 mesh
 ```
+
+`visualize` renders the synthetic dataset as a class x sample image mesh
+(one row per class, 10 columns by default -- a 10x10 grid for the 10-class
+datasets) with the teacher's softmax confidence printed above every image,
+saved to `runs/<case>/synthetic/synthetic_grid.png`. Options:
+`--samples N` (columns per class), `--select first|best|random` (acceptance
+order / highest confidence / seeded random), `--pt PATH` and
+`--grid-out PATH` to point at a specific `.pt` file or output image.
 
 ### Common flags and overrides
 
@@ -186,6 +195,8 @@ Everything lands under `runs/<case>/`:
 - `teacher/teacher_metrics.{csv,json}` — per-epoch teacher training metrics
 - `synthetic/synthetic.pt` — synthetic images, labels, teacher confidences
 - `synthetic/synthesis_stats.json` — per-class query/acceptance/restart stats
+- `synthetic/synthetic_grid.png` — class x sample mesh with teacher softmax
+  confidences (written by `run.py visualize`)
 - `student_zopga/student.pt`, `baselines/student_ce.pt`, `baselines/student_kd.pt` — students
 - `student_zopga/distill_metrics.{csv,json}`,
   `baselines/baseline_{ce,kd}_metrics.{csv,json}` — per-epoch student metrics
@@ -228,6 +239,7 @@ zopga/
   baselines.py            # CE-from-scratch and classical-KD baselines
   diagnostics.py          # scaling curves, effective rank, duplicate check
   evaluate.py             # loss / accuracy / per-class / agreement helpers
+  visualize.py            # synthetic-dataset mesh (labels + softmax confs)
   hardware.py             # hardware detection + auto settings (device, AMP,
                           #   batch scaling, workers, query batch, tf32, ...)
   utils.py                # seeding, logging, metrics history, checkpointing,

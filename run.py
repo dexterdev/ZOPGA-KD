@@ -7,6 +7,8 @@ Subcommands:
   distill         Hinton KD of the student on the synthetic dataset
   baseline        student baselines on real data (--method ce|kd|both)
   diagnose        scaling curves, effective rank, duplicate check
+  visualize       render the synthetic dataset as a class x sample mesh
+                  (10x10 by default) with teacher softmax confidences
   all             full pipeline for one config (teacher -> synthesize ->
                   distill -> baselines -> diagnose), writes results.json
   benchmark       same as 'all' plus per-stage timings and a row appended to
@@ -125,6 +127,22 @@ def stage_baselines(cfg, hw, out_root, logger, method):
                                     os.path.join(out_root, "baselines"),
                                     logger, m, teacher=teacher, hw=hw)
     return results
+
+
+def stage_visualize(cfg, hw, out_root, logger, args):
+    from zopga.visualize import visualize_synthetic
+    pt_path = getattr(args, "pt", None) or synthetic_path(out_root)
+    grid_out = getattr(args, "grid_out", None) or os.path.join(
+        out_root, "synthetic", "synthetic_grid.png")
+    info = dataset_info(cfg["dataset"]["name"])
+    case = cfg.get("case", "")
+    return visualize_synthetic(
+        pt_path, info, grid_out,
+        samples_per_class=getattr(args, "samples", 10),
+        select=getattr(args, "select", "first"), seed=cfg["seed"],
+        title=f"{case}: synthetic images by class "
+              f"(teacher softmax confidence above each image)",
+        logger=logger)
 
 
 def stage_diagnose(cfg, hw, out_root, logger):
@@ -257,7 +275,7 @@ def main():
                     "gradient ascent")
     sub = parser.add_subparsers(dest="command", required=True)
     for cmd in ["train-teacher", "synthesize", "distill", "baseline",
-                "diagnose", "all", "benchmark"]:
+                "diagnose", "visualize", "all", "benchmark"]:
         p = sub.add_parser(cmd)
         p.add_argument("--config", required=True)
         p.add_argument("--device", default="auto")
@@ -272,6 +290,18 @@ def main():
         if cmd == "synthesize":
             p.add_argument("--mode", choices=["zo", "whitebox"], default=None,
                            help="override synthesis.mode")
+        if cmd == "visualize":
+            p.add_argument("--pt", default=None,
+                           help="synthetic .pt path (default: "
+                                "<out>/synthetic/synthetic.pt)")
+            p.add_argument("--grid-out", default=None,
+                           help="output image path (default: "
+                                "<out>/synthetic/synthetic_grid.png)")
+            p.add_argument("--samples", type=int, default=10,
+                           help="samples per class (columns; default 10)")
+            p.add_argument("--select", choices=["first", "best", "random"],
+                           default="first",
+                           help="which samples per class to show")
     args = parser.parse_args()
 
     if getattr(args, "mode", None):
@@ -292,6 +322,8 @@ def main():
         stage_baselines(cfg, hw, out_root, logger, args.method)
     elif args.command == "diagnose":
         stage_diagnose(cfg, hw, out_root, logger)
+    elif args.command == "visualize":
+        stage_visualize(cfg, hw, out_root, logger, args)
 
 
 if __name__ == "__main__":
