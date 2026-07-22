@@ -25,22 +25,9 @@ images on the fly with soft targets.
      `f(x) = log p(c|x)` and directions `uᵢ` sampled at low resolution
      (e.g. 8×8), bilinearly upsampled and normalized. All 2q perturbations of
      all pool candidates are queried in batched forward passes.
-   - *Query augmentation:* with `synthesis.n_random_ops > 0` the queried
-     objective becomes `f(x) = log p(c | A(x))`, where `A` is a fresh random
-     augmentation per gradient step drawn from a 17-operation pool covering
-     geometric, photometric and noise corruptions (`AUG_OPS` in
-     `synthesis/augment.py`): rotate, affine, perspective, zoom_crop,
-     color_jitter, grayscale, gaussian_blur, sharpness, autocontrast,
-     equalize, posterize, solarize, invert, gaussian_noise, salt_pepper,
-     cutout, random_gray_erase. `n_random_ops` distinct ops are applied
-     identically to the whole antithetic batch (both sides of every ± pair
-     see the same `A`, with stochastic pixel noise tiled across the halves,
-     keeping the central difference consistent), which steers candidates
-     toward images the teacher recognizes robustly rather than adversarial
-     noise. The pool is configurable via `synthesis.query_augment` (`all` or
-     a subset of op names). **The τ acceptance test is never augmented** —
-     candidates are accepted on the teacher's confidence for the clean
-     image. Augmentation is also skipped in whitebox mode.
+   Synthesis itself uses no augmentation: both the (ZO or white-box)
+   gradient objective and the τ acceptance test always see the clean
+   candidate images.
    - *Update:* heavy-ball momentum with normalized step, or ZO-AdaMM
      (Adam moments with low `β2 = 0.9`, bias-corrected).
    - *Projection:* clamp to the valid pixel box (the `[0,1]` range mapped
@@ -50,11 +37,19 @@ images on the fly with soft targets.
    The result is a balanced synthetic dataset labeled by construction, saved
    with teacher confidences. A white-box variant (true input gradients,
      `--mode whitebox`) is included as an upper-bound reference.
-3. **Distillation.** The student trains on synthetic data only. Each batch is
-   augmented (crop/flip/rotation/cutout for CIFAR; affine/cutout for
-   MNIST-like), the teacher relabels the augmented images with soft targets at
-   temperature `T`, and the student minimizes `KL(student_T ‖ teacher_T) · T²`
-   (KD-only loss — synthetic labels are correct by construction).
+3. **Distillation.** The student trains on synthetic data only. Each batch
+   is augmented on the fly with `distill.n_random_ops` random operations
+   drawn from a 17-operation pool covering geometric, photometric and noise
+   corruptions (`AUG_OPS` in `zopga/augment.py`): rotate, affine,
+   perspective, zoom_crop, color_jitter, grayscale, gaussian_blur,
+   sharpness, autocontrast, equalize, posterize, solarize, invert,
+   gaussian_noise, salt_pepper, cutout, random_gray_erase. The pool is
+   restrictable via `distill.query_augment` (`all` or a subset of op names);
+   `n_random_ops: 0` disables augmentation. The teacher is then **queried on
+   the augmented images** for fresh soft targets at temperature `T`, and the
+   student minimizes `KL(student_T ‖ teacher_T) · T²` (KD-only loss —
+   synthetic labels are correct by construction), so every epoch the student
+   effectively sees new teacher-labelled views of the synthetic set.
 4. **Baselines & diagnostics.** Same student architecture trained (a) with CE
    on real data and (b) with classical KD on real data. Diagnostics on the
    synthetic set: subsample scaling curves (accuracy vs data fraction),
@@ -236,9 +231,10 @@ single GPU. For paper-quality results, scale up via config or `--set`:
 - distillation epochs: 100+, `--set distill.epochs=100`
 - try `--set synthesis.optimizer=adamm` and the `--mode whitebox` reference
   to bound the ZO gradient-estimation gap.
-- ablate the init families (`--set 'synthesis.init=[perlin]'`) and the query
-  augmentation (`--set synthesis.n_random_ops=0` to disable, or restrict the
-  pool, e.g. `--set 'synthesis.query_augment=[rotate,cutout,brightness]'`).
+- ablate the init families (`--set 'synthesis.init=[perlin]'`) and the
+  distillation augmentation (`--set distill.n_random_ops=0` to disable, or
+  restrict the pool, e.g.
+  `--set 'distill.query_augment=[rotate,zoom_crop,cutout]'`).
 
 ## Repository layout
 
@@ -253,10 +249,11 @@ zopga/
   synthesis/
     initializers.py       # low-frequency init families (gradients, Perlin);
                           #   pool selected by synthesis.init
-    augment.py            # classic 17-op query augmentation (n_random_ops)
     zo.py                 # ZO gradient estimators + white-box reference
     optimizers.py         # heavy-ball, ZO-AdaMM
     synthesizer.py        # ZO-PGA loop (projection, acceptance, restarts, pool)
+  augment.py              # 17-op random batch augmentation for distillation
+                          #   (distill.query_augment / distill.n_random_ops)
   distill.py              # Hinton KD on synthetic data (on-the-fly relabeling)
   baselines.py            # CE-from-scratch and classical-KD baselines
   diagnostics.py          # scaling curves, effective rank, duplicate check

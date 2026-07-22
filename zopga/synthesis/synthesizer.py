@@ -7,14 +7,11 @@ teacher's log p(c | x) in (normalized) pixel space:
              family pool is the `init` hyperparameter
 2. gradient: antithetic central differences over q low-frequency directions,
              batched teacher queries (2q per candidate per step), or true
-             input gradients in whitebox mode. With `n_random_ops` > 0 the
-             queried objective is log p(c | A(x)) for a random augmentation
-             A from the classic 17-op pool (see augment.py)
+             input gradients in whitebox mode
 3. update:   heavy-ball or ZO-AdaMM
 4. project:  clamp to the valid pixel box after every step
-5. accept:   keep image when teacher confidence in the target class >= tau,
-             always measured on the CLEAN (un-augmented) image; abandon and
-             restart from a fresh init after a step budget.
+5. accept:   keep image when teacher confidence in the target class >= tau;
+             abandon and restart from a fresh init after a step budget.
 
 A persistent pool of in-progress candidates is cycled until the per-class
 target count is reached, yielding a balanced synthetic dataset labelled by
@@ -28,7 +25,6 @@ import numpy as np
 import torch
 
 from ..utils import ensure_dir, save_checkpoint, save_json
-from .augment import QueryAugment
 from .initializers import resolve_families, sample_init
 from .optimizers import make_optimizer
 from .zo import estimate_gradient, query_confidence, whitebox_gradient
@@ -48,7 +44,6 @@ class ZOPGASynthesizer:
         self.gen.manual_seed(seed + 1)
 
         self.init_families = resolve_families(cfg.get("init", "all"))
-        self.augment = QueryAugment(cfg, data_info, self.rng)
 
         c = data_info["in_channels"]
         s = data_info["image_size"]
@@ -113,9 +108,7 @@ class ZOPGASynthesizer:
             else:
                 g = estimate_gradient(self.teacher, pool, class_idx, q, sigma,
                                       int(cfg.get("lowres", 8)), self.shape,
-                                      self.device, self.gen, chunk,
-                                      transform=self.augment
-                                      if self.augment.enabled else None)
+                                      self.device, self.gen, chunk)
                 queries += pool_size * 2 * q
             pool += opt.step(g, lr)
             pool = torch.maximum(torch.minimum(pool, self.box_hi), self.box_lo)
@@ -184,14 +177,11 @@ class ZOPGASynthesizer:
         num_classes = self.info["num_classes"]
         all_imgs, all_labels, all_confs = [], [], []
         per_class_stats = {}
-        aug_desc = (f"{self.augment.n_ops} random ops/"
-                    f"{len(self.augment.ops)}-op pool"
-                    if self.augment.enabled else "off")
         for c in range(num_classes):
             self._log(f"Synthesizing class {c} "
                       f"(mode={self.cfg.get('mode', 'zo')}, "
                       f"optimizer={self.cfg.get('optimizer', 'heavyball')}, "
-                      f"init={self.init_families}, query_augment={aug_desc})")
+                      f"init={self.init_families})")
             imgs, confs, stats = self._synthesize_class(c)
             all_imgs.append(imgs.view(-1, *self.shape))
             all_labels.append(torch.full((imgs.size(0),), c, dtype=torch.long))
