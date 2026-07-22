@@ -40,7 +40,9 @@ student:
 synthesis:
   mode: zo
   init: all                 # candidate init families: all | subset of
-                            #   [corner, horizontal, vertical, angled, radial, perlin]
+                            #   [corner, horizontal, vertical, angled, radial,
+                            #   perlin, checkerboard, gabor, uniform, gaussian,
+                            #   pink, edges]
   per_class: 200
   q: 32
   sigma: 0.01
