@@ -71,15 +71,33 @@ def sample_pattern(rng, family, h, w):
     raise ValueError(f"Unknown init family '{family}'")
 
 
-def sample_init(rng, shape, mean, std):
+def resolve_families(spec):
+    """Resolve the `synthesis.init` config value into a family list.
+
+    spec: "all" / None for every family, or a list (or single name) drawn
+    from FAMILIES. Raises on unknown names.
+    """
+    if spec in (None, "all"):
+        return list(FAMILIES)
+    families = [spec] if isinstance(spec, str) else list(spec)
+    unknown = [f for f in families if f not in FAMILIES]
+    if unknown or not families:
+        raise ValueError(f"synthesis.init must be 'all' or a non-empty subset "
+                         f"of {FAMILIES}, got {spec!r}")
+    return families
+
+
+def sample_init(rng, shape, mean, std, families=None):
     """Sample one candidate image in *normalized* space.
 
     shape: (C, H, W). mean/std: per-channel normalization constants (tuples).
-    A pattern family is chosen at random; per-channel patterns are randomly
-    scaled and offset so the whole valid pixel box is covered over draws.
+    A pattern family is chosen at random from `families` (default: all);
+    per-channel patterns are randomly scaled and offset so the whole valid
+    pixel box is covered over draws.
     """
     c, h, w = shape
-    family = FAMILIES[rng.integers(0, len(FAMILIES))]
+    families = families or FAMILIES
+    family = families[rng.integers(0, len(families))]
     px = np.empty(shape, dtype=np.float32)
     for ch in range(c):
         pat = sample_pattern(rng, family, h, w)

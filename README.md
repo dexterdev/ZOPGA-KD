@@ -19,11 +19,26 @@ images on the fly with soft targets.
    candidate images is cycled until `per_class` images are accepted:
    - *Init:* diverse low-frequency patterns — smooth gradients (corner,
      horizontal, vertical, angled, radial) and fractal Perlin noise — never
-     white noise.
+     white noise. The family pool is the `synthesis.init` hyperparameter
+     (`all` or any subset, e.g. `init: [perlin, radial]`).
    - *Gradient:* `g ≈ (1/q) Σ [f(x+σuᵢ) − f(x−σuᵢ)] / (2σ) · uᵢ`, with
      `f(x) = log p(c|x)` and directions `uᵢ` sampled at low resolution
      (e.g. 8×8), bilinearly upsampled and normalized. All 2q perturbations of
      all pool candidates are queried in batched forward passes.
+   - *Query augmentation:* with `synthesis.n_random_ops > 0` the queried
+     objective becomes `f(x) = log p(c | A(x))`, where `A` is a fresh random
+     augmentation per gradient step drawn from the classic 17-operation pool
+     (AutoAugment's 16 ops + identity: shear/translate x-y, rotate,
+     auto-contrast, invert, equalize, solarize, posterize, contrast, color,
+     brightness, sharpness, cutout, sample-pairing). `n_random_ops` distinct
+     ops are applied identically to the whole antithetic batch (both sides of
+     every ± pair see the same `A`, keeping the central difference
+     consistent), which steers candidates toward images the teacher
+     recognizes robustly rather than adversarial noise. The pool is
+     configurable via `synthesis.query_augment` (`all` or a subset of op
+     names). **The τ acceptance test is never augmented** — candidates are
+     accepted on the teacher's confidence for the clean image. Augmentation
+     is also skipped in whitebox mode.
    - *Update:* heavy-ball momentum with normalized step, or ZO-AdaMM
      (Adam moments with low `β2 = 0.9`, bias-corrected).
    - *Projection:* clamp to the valid pixel box (the `[0,1]` range mapped
@@ -219,6 +234,9 @@ single GPU. For paper-quality results, scale up via config or `--set`:
 - distillation epochs: 100+, `--set distill.epochs=100`
 - try `--set synthesis.optimizer=adamm` and the `--mode whitebox` reference
   to bound the ZO gradient-estimation gap.
+- ablate the init families (`--set 'synthesis.init=[perlin]'`) and the query
+  augmentation (`--set synthesis.n_random_ops=0` to disable, or restrict the
+  pool, e.g. `--set 'synthesis.query_augment=[rotate,cutout,brightness]'`).
 
 ## Repository layout
 
@@ -231,7 +249,9 @@ zopga/
   data.py                 # CIFAR-10 / Fashion-MNIST / MNIST loaders & splits
   teacher.py              # teacher CE training + frozen black-box loading
   synthesis/
-    initializers.py       # low-frequency init families (gradients, Perlin)
+    initializers.py       # low-frequency init families (gradients, Perlin);
+                          #   pool selected by synthesis.init
+    augment.py            # classic 17-op query augmentation (n_random_ops)
     zo.py                 # ZO gradient estimators + white-box reference
     optimizers.py         # heavy-ball, ZO-AdaMM
     synthesizer.py        # ZO-PGA loop (projection, acceptance, restarts, pool)
