@@ -4,8 +4,9 @@ Renders synthetic/synthetic.pt as a class x sample image mesh (one row per
 class, `samples_per_class` columns -- 10x10 by default for the 10-class
 datasets). Each cell shows the de-normalized image with the teacher's softmax
 confidence for the constructed label above it; rows are labelled with the
-class index. Selection per row: acceptance order ('first'), highest
-confidence ('best') or a seeded random sample ('random').
+dataset's class names (falling back to the class index when the dataset
+registry has no names). Selection per row: acceptance order ('first'),
+highest confidence ('best') or a seeded random sample ('random').
 """
 
 import matplotlib
@@ -31,6 +32,7 @@ def visualize_synthetic(pt_path, info, out_path, samples_per_class=10,
     confs = confs.cpu() if confs is not None else None
 
     classes = sorted(int(c) for c in labels.unique())
+    class_names = info.get("classes")
     rows, cols = len(classes), int(samples_per_class)
     fig, axes = plt.subplots(rows, cols,
                              figsize=(cols * 1.15, rows * 1.3), squeeze=False)
@@ -60,7 +62,9 @@ def visualize_synthetic(pt_path, info, out_path, samples_per_class=10,
                 ax.imshow(img.permute(1, 2, 0))
             if confs is not None:
                 ax.set_title(f"{float(confs[pick[j]]):.2f}", fontsize=7, pad=2)
-        axes[r][0].set_ylabel(f"class {c}", fontsize=8)
+        name = class_names[c] if class_names and c < len(class_names) \
+            else f"class {c}"
+        axes[r][0].set_ylabel(name, fontsize=8)
 
     if title is None:
         title = (f"Synthetic dataset ({select} {cols}/class) -- "
