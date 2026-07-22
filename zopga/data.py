@@ -15,6 +15,8 @@ DATASETS = {
         "image_size": 32,
         "mean": (0.4914, 0.4822, 0.4465),
         "std": (0.2470, 0.2435, 0.2616),
+        "classes": ("airplane", "automobile", "bird", "cat", "deer",
+                    "dog", "frog", "horse", "ship", "truck"),
     },
     "fashionmnist": {
         "num_classes": 10,
@@ -22,6 +24,8 @@ DATASETS = {
         "image_size": 32,
         "mean": (0.2860,),
         "std": (0.3530,),
+        "classes": ("T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+                    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"),
     },
     "mnist": {
         "num_classes": 10,
@@ -29,6 +33,8 @@ DATASETS = {
         "image_size": 32,
         "mean": (0.1307,),
         "std": (0.3081,),
+        "classes": ("digit 0", "digit 1", "digit 2", "digit 3", "digit 4",
+                    "digit 5", "digit 6", "digit 7", "digit 8", "digit 9"),
     },
 }
 
