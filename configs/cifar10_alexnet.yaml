@@ -39,6 +39,12 @@ student:
 
 synthesis:
   mode: zo
+  init: all                 # candidate init families: all | subset of
+                            #   [corner, horizontal, vertical, angled, radial, perlin]
+  query_augment: all        # ZO query-augmentation pool: all (classic 17 ops =
+                            #   AutoAugment's 16 + identity) | subset of op names
+  n_random_ops: 2           # random ops per gradient query (0 = augmentation off);
+                            #   tau acceptance always uses the clean image
   per_class: 200
   q: 32
   sigma: 0.01
