@@ -27,18 +27,20 @@ images on the fly with soft targets.
      all pool candidates are queried in batched forward passes.
    - *Query augmentation:* with `synthesis.n_random_ops > 0` the queried
      objective becomes `f(x) = log p(c | A(x))`, where `A` is a fresh random
-     augmentation per gradient step drawn from the classic 17-operation pool
-     (AutoAugment's 16 ops + identity: shear/translate x-y, rotate,
-     auto-contrast, invert, equalize, solarize, posterize, contrast, color,
-     brightness, sharpness, cutout, sample-pairing). `n_random_ops` distinct
-     ops are applied identically to the whole antithetic batch (both sides of
-     every ± pair see the same `A`, keeping the central difference
-     consistent), which steers candidates toward images the teacher
-     recognizes robustly rather than adversarial noise. The pool is
-     configurable via `synthesis.query_augment` (`all` or a subset of op
-     names). **The τ acceptance test is never augmented** — candidates are
-     accepted on the teacher's confidence for the clean image. Augmentation
-     is also skipped in whitebox mode.
+     augmentation per gradient step drawn from a 17-operation pool covering
+     geometric, photometric and noise corruptions (`AUG_OPS` in
+     `synthesis/augment.py`): rotate, affine, perspective, zoom_crop,
+     color_jitter, grayscale, gaussian_blur, sharpness, autocontrast,
+     equalize, posterize, solarize, invert, gaussian_noise, salt_pepper,
+     cutout, random_gray_erase. `n_random_ops` distinct ops are applied
+     identically to the whole antithetic batch (both sides of every ± pair
+     see the same `A`, with stochastic pixel noise tiled across the halves,
+     keeping the central difference consistent), which steers candidates
+     toward images the teacher recognizes robustly rather than adversarial
+     noise. The pool is configurable via `synthesis.query_augment` (`all` or
+     a subset of op names). **The τ acceptance test is never augmented** —
+     candidates are accepted on the teacher's confidence for the clean
+     image. Augmentation is also skipped in whitebox mode.
    - *Update:* heavy-ball momentum with normalized step, or ZO-AdaMM
      (Adam moments with low `β2 = 0.9`, bias-corrected).
    - *Projection:* clamp to the valid pixel box (the `[0,1]` range mapped
