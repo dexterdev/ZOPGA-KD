@@ -1,0 +1,78 @@
+# Fashion-MNIST: LeNet-5 teacher -> LeNet-5-Half student (32x32, single channel)
+case: fashionmnist_lenet
+seed: 42
+
+# Hardware-aware run settings. Every 'auto' is resolved against the
+# detected GPU VRAM / system RAM / CPU count at startup and logged.
+hardware:
+  device: auto              # auto | cpu | cuda | cuda:N | mps
+  precision: auto           # auto | amp | fp32  (amp = CUDA mixed precision)
+  batch_size: auto          # auto | int | null  (auto scales per-stage batch
+                            #   sizes to available memory; int overrides them;
+                            #   null keeps the per-stage config values)
+  query_batch: auto         # auto | int | null  (synthesis teacher-query batch)
+  num_workers: auto         # auto | int  (dataloader workers from CPU count)
+  pin_memory: auto          # auto | true | false
+  cpu_threads: auto         # auto | int  (torch CPU threads on cpu runs)
+  cudnn_benchmark: true     # cuDNN autotuner (CUDA only)
+  allow_tf32: true          # TF32 matmul on Ampere+ GPUs
+  compile_teacher: false    # torch.compile the frozen teacher (PyTorch 2.x)
+  memory_fraction: 0.8      # fraction of free memory auto sizing may plan for
+
+dataset:
+  name: fashionmnist
+  root: ./data
+  val_fraction: 0.1
+  max_train_samples: null
+
+teacher:
+  arch: lenet5
+  epochs: 15
+  batch_size: 128
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  schedule: cosine
+
+student:
+  arch: lenet5_half
+
+synthesis:
+  mode: zo
+  per_class: 100
+  q: 32
+  sigma: 0.01
+  lr: 0.05
+  steps: 500
+  tau: 0.99
+  optimizer: heavyball
+  lowres: 8
+  pool_size: 32
+  beta1: 0.9
+  beta2: 0.9
+  query_batch: 512
+  max_total_iters: 20000
+
+distill:
+  epochs: 30
+  batch_size: 256
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  temperature: 10
+  eval_every: 5             # real-test eval every N distill epochs (0 = off)
+  augmentations: [affine, cutout]
+
+baseline:
+  epochs: 30
+  batch_size: 128
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  temperature: 10
+  alpha: 0.9
+
+diagnostics:
+  fractions: [0.1, 0.25, 0.5, 1.0]
+  epochs: 15
+  nn_threshold: 0.1

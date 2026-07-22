@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Data / artifacts
+data/
+runs/
+*.pt
+*.pth
+*.ckpt
+
+# Logs / results
+*.log
+results.json
+diagnostics.json
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
