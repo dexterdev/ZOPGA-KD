@@ -1,10 +1,12 @@
 """Hinton knowledge distillation on the synthetic dataset.
 
 The student trains on synthetic data only. Each batch is augmented on the fly
-(dataset-appropriate augmentation pool), the frozen teacher relabels the
-*augmented* images with soft targets at temperature T, and the student
-minimizes the temperature-scaled KL divergence (KD-only loss, T^2 factor --
-no CE term, since synthetic labels are correct by construction).
+with `distill.n_random_ops` random operations from the 17-op pool (see
+augment.py; pool restrictable via `distill.query_augment`), the frozen
+teacher is queried on the *augmented* images for fresh soft targets at
+temperature T, and the student minimizes the temperature-scaled KL
+divergence (KD-only loss, T^2 factor -- no CE term, since synthetic labels
+are correct by construction).
 
 Per-epoch metrics (kd loss, teacher/student agreement, accuracy vs the
 synthetic labels, lr, time, throughput, and optionally real-test loss/acc
@@ -14,10 +16,11 @@ distill_metrics.csv / distill_metrics.json.
 
 import time
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-from torchvision.transforms import v2 as T
 
+from .augment import RandomOpsAugment
 from .data import dataset_info, get_dataloaders
 from .evaluate import evaluate
 from .hardware import default_hardware
@@ -34,28 +37,6 @@ def kd_loss(student_logits, teacher_logits, temperature):
     return F.kl_div(log_p_s, p_t, reduction="batchmean") * (t * t)
 
 
-def build_augment(names, image_size):
-    """Build a batched-tensor augmentation pipeline (operates in [0,1] pixel space).
-
-    Returns None when no augmentations are requested."""
-    tfms = []
-    for name in names or []:
-        if name == "crop":
-            tfms.append(T.RandomCrop(image_size, padding=4))
-        elif name == "flip":
-            tfms.append(T.RandomHorizontalFlip())
-        elif name == "rotate":
-            tfms.append(T.RandomRotation(10))
-        elif name == "affine":
-            tfms.append(T.RandomAffine(degrees=15, translate=(0.1, 0.1),
-                                       scale=(0.9, 1.1)))
-        elif name == "cutout":
-            tfms.append(T.RandomErasing(p=0.5, scale=(0.02, 0.15), value=0))
-        else:
-            raise ValueError(f"Unknown augmentation '{name}'")
-    return T.Compose(tfms) if tfms else None
-
-
 def train_student_kd(student, teacher, images, labels, cfg, data_info, device,
                      logger=None, tag="distill", hw=None, eval_loader=None,
                      metrics=None):
@@ -63,6 +44,9 @@ def train_student_kd(student, teacher, images, labels, cfg, data_info, device,
 
     images: normalized-space tensor (N, C, H, W); labels: synthetic labels
     (correct by construction, used only as a training metric).
+    Every batch is augmented with cfg['n_random_ops'] random ops from the
+    17-op pool (cfg['query_augment']) and the teacher is queried on the
+    augmented images for the soft targets.
     eval_loader: optional real-data loader evaluated every
     cfg['eval_every'] epochs (0/None disables per-epoch evaluation).
     Returns final train stats.
@@ -78,7 +62,11 @@ def train_student_kd(student, teacher, images, labels, cfg, data_info, device,
 
     mean = torch.tensor(info["mean"], device=device).view(1, -1, 1, 1)
     std = torch.tensor(info["std"], device=device).view(1, -1, 1, 1)
-    augment = build_augment(dcfg.get("augmentations"), info["image_size"])
+    augment = RandomOpsAugment(
+        dcfg.get("query_augment", "all"), dcfg.get("n_random_ops", 0),
+        np.random.default_rng(cfg.get("seed", 42) + 13))
+    if logger is not None:
+        logger.info(f"[{tag}] batch augmentation: {augment.describe()}")
 
     images = images.to(device)
     labels = labels.to(device)
@@ -102,8 +90,7 @@ def train_student_kd(student, teacher, images, labels, cfg, data_info, device,
             idx = perm[i:i + batch_size]
             xb, yb = images[idx], labels[idx]
             xb_px = (xb * std + mean).clamp(0.0, 1.0)
-            if augment is not None:
-                xb_px = augment(xb_px)
+            xb_px = augment.apply_px(xb_px)
             xb_aug = (xb_px - mean) / std
             with torch.no_grad(), hw.autocast():
                 t_logits = teacher(xb_aug)

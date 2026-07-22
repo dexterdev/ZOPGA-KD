@@ -41,10 +41,6 @@ synthesis:
   mode: zo
   init: all                 # candidate init families: all | subset of
                             #   [corner, horizontal, vertical, angled, radial, perlin]
-  query_augment: all        # ZO query-augmentation pool: all (17 ops: geometric,
-                            #   photometric, noise -- see synthesis/augment.py) | subset
-  n_random_ops: 2           # random ops per gradient query (0 = augmentation off);
-                            #   tau acceptance always uses the clean image
   per_class: 200
   q: 32
   sigma: 0.01
@@ -67,7 +63,11 @@ distill:
   weight_decay: 0.0005
   temperature: 10
   eval_every: 5             # real-test eval every N distill epochs (0 = off)
-  augmentations: [crop, flip, rotate, cutout]
+  query_augment: all        # on-the-fly batch augmentation pool: all (17 ops:
+                            #   geometric, photometric, noise -- zopga/augment.py)
+                            #   | subset of op names
+  n_random_ops: 2           # random ops per batch; the teacher is queried on the
+                            #   augmented images for soft targets (0 = off)
 
 baseline:
   epochs: 30

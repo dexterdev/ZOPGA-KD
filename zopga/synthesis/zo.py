@@ -50,26 +50,17 @@ def query_confidence(teacher, flat_x, class_idx, shape, chunk=512):
 
 
 def estimate_gradient(teacher, x, class_idx, q, sigma, lowres, shape, device,
-                      generator=None, chunk=512, transform=None):
+                      generator=None, chunk=512):
     """Antithetic central-difference ZO gradient for a pool of candidates.
 
     x: (P, D) flat candidates. Returns g: (P, D).
-
-    transform: optional query augmentation (see augment.QueryAugment); the
-    objective becomes f(x) = log p(c | A(x)). The [plus; minus] batch is
-    augmented in one paired call so both sides of every antithetic pair see
-    the identical A, keeping the central difference consistent.
     """
     p, d = x.shape
     u = sample_directions(p * q, shape, lowres, device, generator).view(p, q, d)
     x_plus = (x.unsqueeze(1) + sigma * u).reshape(p * q, d)
     x_minus = (x.unsqueeze(1) - sigma * u).reshape(p * q, d)
-    x_pm = torch.cat([x_plus, x_minus])
-    if transform is not None:
-        x_pm = transform(x_pm, shape, paired=True)
-    f_pm = query_logprob(teacher, x_pm, class_idx, shape, chunk)
-    f_plus = f_pm[:p * q].view(p, q)
-    f_minus = f_pm[p * q:].view(p, q)
+    f_plus = query_logprob(teacher, x_plus, class_idx, shape, chunk).view(p, q)
+    f_minus = query_logprob(teacher, x_minus, class_idx, shape, chunk).view(p, q)
     coeff = (f_plus - f_minus) / (2.0 * sigma)          # (P, q)
     return (coeff.unsqueeze(-1) * u).mean(dim=1)
 
